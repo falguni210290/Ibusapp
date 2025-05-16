@@ -1,0 +1,51 @@
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import sqlite3
+
+app = FastAPI()
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    password: str
+
+def get_connection():
+    return sqlite3.connect("ibus_users.db")
+
+@app.on_event("startup")
+def create_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            password TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+@app.post("/register")
+def register_user(request: RegisterRequest):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)",
+            (request.name, request.email, request.phone, request.password)
+        )
+        conn.commit()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
+    return {"message": "User registered successfully"}
+
+@app.get("/")
+def root():
+    return {"message": "Hello from iBus"}
